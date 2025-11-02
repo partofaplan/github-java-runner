@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+if [[ -n "${RUNNER_DEBUG:-}" ]]; then
+  set -x
+fi
+
+log() {
+  echo "[$(date --iso-8601=seconds)] $*"
+}
+
+require_env() {
+  local name="$1"
+  if [[ -z "${!name:-}" ]]; then
+    log "ERROR: Environment variable ${name} is required but not set."
+    exit 1
+  fi
+}
+
+require_env "GITHUB_OWNER"
+require_env "GITHUB_PAT"
+
+SERVER_URL="${GITHUB_SERVER_URL:-https://github.com}"
+API_URL="${GITHUB_API_URL:-https://api.github.com}"
+
+SERVER_URL="${SERVER_URL%/}"
+API_URL="${API_URL%/}"
+
+TARGET_URL=""
+SCOPE_PATH=""
+if [[ -n "${GITHUB_REPOSITORY:-}" ]]; then
+  SCOPE_PATH="repos/${GITHUB_OWNER}/${GITHUB_REPOSITORY}"
+  SCOPE_DESC="repository ${GITHUB_OWNER}/${GITHUB_REPOSITORY}"
+  TARGET_URL="${SERVER_URL}/${GITHUB_OWNER}/${GITHUB_REPOSITORY}"
+else
+  SCOPE_PATH="orgs/${GITHUB_OWNER}"
+  SCOPE_DESC="organization ${GITHUB_OWNER}"
+  TARGET_URL="${SERVER_URL}/${GITHUB_OWNER}"
+fi
+
+RUNNER_NAME="${RUNNER_NAME:-${HOSTNAME}}"
+RUNNER_WORKDIR="${RUNNER_WORKDIR:-_work}"
+RUNNER_LABELS="${RUNNER_LABELS:-self-hosted,kubernetes}"
+
+github_api() {
+  local method="$1"
+  local path="$2"
+  shift 2
+  curl -fsSL -X "${method}" \
+    -H "Accept: application/vnd.github+json" \
+    -H "Authorization: Bearer ${GITHUB_PAT}" \
+    -H "X-GitHub-Api-Version: 2022-11-28" \
+    "${API_URL}/${path}" "$@"
+}
+
+fetch_token() {
+  local action="$1" # registration-token or remove-token
+  local json
+  if ! json="$(github_api POST "${SCOPE_PATH}/actions/runners/${action}")"; then
+    log "ERROR: Failed to request ${action} for ${SCOPE_DESC}"
+    return 1
+  fi
+  python3 - <<'PY' <<<"${json}"
+import json,sys
+try:
+    print(json.load(sys.stdin)["token"])
+except (KeyError, json.JSONDecodeError):
+    raise SystemExit(1)
+PY
+}
+
+log "Requesting short-lived registration token for ${SCOPE_DESC}…"
+REG_TOKEN="$(fetch_token registration-token)"
+
+if [[ -z "${REG_TOKEN}" ]]; then
+  log "ERROR: Registration token response did not contain a token."
+  exit 1
+fi
+
+cleanup() {
+  log "Runner shutdown requested. Attempting deregistration…"
+  if REMOVE_TOKEN="$(fetch_token remove-token)"; then
+    ./config.sh remove --unattended --token "${REMOVE_TOKEN}" || true
+    log "Runner deregistered from ${SCOPE_DESC}"
+  else
+    log "WARNING: Failed to obtain removal token; runner may remain registered."
+  fi
+}
+
+trap cleanup EXIT INT TERM
+
+log "Configuring runner ${RUNNER_NAME} in workdir ${RUNNER_WORKDIR} with labels ${RUNNER_LABELS}"
+
+./config.sh \
+  --url "${TARGET_URL}" \
+  --token "${REG_TOKEN}" \
+  --name "${RUNNER_NAME}" \
+  --labels "${RUNNER_LABELS}" \
+  --work "${RUNNER_WORKDIR}" \
+  --unattended \
+  --replace
+
+log "Runner configuration complete; starting listener…"
+exec ./run.sh

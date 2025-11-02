@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: github-runner
+  namespace: github-actions-runner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: github-runner
+  template:
+    metadata:
+      labels:
+        app: github-runner
+    spec:
+      serviceAccountName: github-runner
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: runner
+          image: ghcr.io/actions/actions-runner:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/bash", "/runner/runner-entrypoint.sh"]
+          env:
+            - name: GITHUB_OWNER
+              value: "partofaplan"
+            - name: GITHUB_REPOSITORY
+              value: "github-java-runner"
+            - name: RUNNER_LABELS
+              value: "self-hosted,kubernetes,local,alpha"
+            - name: RUNNER_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: GITHUB_PAT
+              valueFrom:
+                secretKeyRef:
+                  name: github-runner-secret
+                  key: GITHUB_PAT
+          volumeMounts:
+            - name: runner-scripts
+              mountPath: /runner/runner-entrypoint.sh
+              subPath: runner-entrypoint.sh
+            - name: runner-work
+              mountPath: /actions-runner/_work
+          resources:
+            requests:
+              cpu: "500m"
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+      volumes:
+        - name: runner-scripts
+          configMap:
+            name: github-runner-scripts
+            defaultMode: 0755
+        - name: runner-work
+          emptyDir: {}
