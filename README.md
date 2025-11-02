@@ -9,7 +9,7 @@ Deploy a self-hosted GitHub Actions runner into a local Kubernetes cluster using
   - Requests short-lived registration & removal tokens through the GitHub REST API.
   - Registers the runner with configurable labels.
   - Deregisters cleanly when the pod terminates.
-- **Deployment** `github-runner` running a single replica based on `ghcr.io/actions/actions-runner:latest`.
+- **Deployment** `github-runner` running a single replica of `partofaplan/github-actions-runner-java:latest` (extends the official image with Temurin JDK 17 and Apache Maven).
 
 All manifests live under `manifests/` and are bundled via Kustomize.
 
@@ -35,7 +35,20 @@ kubectl -n github-actions-runner create secret generic github-runner-secret \
 
 If you prefer YAML, see `manifests/secret-pat.yaml.sample`, replace the placeholder, and `kubectl apply` it (remember to keep it out of version control).
 
-## 2. Configure the Deployment
+## 2. Build & Push the Java Runner Image
+
+A lightweight Dockerfile (`docker/Dockerfile`) extends the official runner image with OpenJDK 17 and Maven 3.9.6 pre-installed so Maven builds work out-of-the-box.
+
+```bash
+IMAGE_TAG=partofaplan/github-actions-runner-java:latest
+
+docker build -t "${IMAGE_TAG}" docker/
+docker push "${IMAGE_TAG}"
+```
+
+If you prefer a different tag (e.g., to version images), update both the push command and the image reference in `manifests/deployment.yaml`.
+
+## 3. Configure the Deployment
 Edit `manifests/deployment.yaml` to match your target:
 
 - `GITHUB_OWNER`: GitHub user or organization login that owns the runner scope.
@@ -54,7 +67,7 @@ Example adjustments for a repository runner:
           value: "your-repo"
 ```
 
-## 3. Deploy the Runner
+## 4. Deploy the Runner
 
 ```bash
 kubectl apply -k manifests/
@@ -69,7 +82,7 @@ kubectl -n github-actions-runner logs deploy/github-runner -f
 
 Within a few seconds the runner should appear in the GitHub UI under **Settings → Actions → Runners** for the configured scope.
 
-## 4. Verify & Use
+## 5. Verify & Use
 - Trigger a workflow that targets the self-hosted runner (e.g. `runs-on: [self-hosted, kubernetes]`).
 - During job execution the runner pod will show log output; the job workspace lives in an ephemeral `emptyDir` volume mounted at `/actions-runner/_work`.
 

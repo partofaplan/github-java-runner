@@ -17,7 +17,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
         - name: runner
-          image: ghcr.io/actions/actions-runner:latest
+          image: partofaplan/github-actions-runner-java:latest
           imagePullPolicy: IfNotPresent
           command: ["/bin/bash", "/runner/runner-entrypoint.sh"]
           env:
