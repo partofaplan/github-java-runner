@@ -13,17 +13,18 @@ RUN apt-get update \
         ca-certificates \
         tar \
         gnupg \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN curl -fsSL "https://dlcdn.apache.org/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" -o /tmp/maven.tar.gz \
+    && curl -fsSL "https://dlcdn.apache.org/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" -o /tmp/maven.tar.gz \
     && echo "${MAVEN_SHA512}  /tmp/maven.tar.gz" | sha512sum -c - \
     && tar -xzf /tmp/maven.tar.gz -C /opt \
     && ln -s /opt/apache-maven-${MAVEN_VERSION} /opt/maven \
-    && rm /tmp/maven.tar.gz
+    && rm /tmp/maven.tar.gz \
+    && JAVA_HOME="$(dirname "$(dirname "$(readlink -f "$(command -v java)")")")" \
+    && ln -sfn "${JAVA_HOME}" /opt/java-home \
+    && rm -rf /var/lib/apt/lists/*
 
-ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+ENV JAVA_HOME=/opt/java-home
 ENV MAVEN_HOME=/opt/maven
-ENV PATH="${MAVEN_HOME}/bin:${PATH}"
+ENV PATH="${MAVEN_HOME}/bin:${JAVA_HOME}/bin:${PATH}"
 
 RUN java -version && mvn -version
 
