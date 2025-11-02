@@ -37,7 +37,7 @@ If you prefer YAML, see `manifests/secret-pat.yaml.sample`, replace the placehol
 
 ## 2. Build & Push the Java Runner Image
 
-A lightweight Dockerfile (`docker/Dockerfile`) extends the official runner image with OpenJDK 17 and Maven 3.9.6 pre-installed so Maven builds work out-of-the-box.
+A lightweight Dockerfile (`docker/Dockerfile`) extends the official runner image with OpenJDK 17 and Maven 3.9.11 pre-installed so Maven builds work out-of-the-box.
 
 ```bash
 IMAGE_TAG=partofaplan/github-actions-runner-java:latest
