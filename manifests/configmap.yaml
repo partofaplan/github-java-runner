@@ -44,7 +44,7 @@ data:
       SCOPE_PATH="orgs/${GITHUB_OWNER}"
       SCOPE_DESC="organization ${GITHUB_OWNER}"
       TARGET_URL="${SERVER_URL}/${GITHUB_OWNER}"
-    }
+    fi
 
     RUNNER_NAME="${RUNNER_NAME:-${HOSTNAME}}"
     RUNNER_WORKDIR="${RUNNER_WORKDIR:-_work}"
@@ -83,7 +83,7 @@ data:
     if [[ -z "${REG_TOKEN}" ]]; then
       log "ERROR: Registration token response did not contain a token."
       exit 1
-    }
+    fi
 
     cleanup() {
       log "Runner shutdown requested. Attempting deregistration…"
