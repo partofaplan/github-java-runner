@@ -11,11 +11,11 @@ Deploy a self-hosted GitHub Actions runner into a local Kubernetes cluster using
   - Deregisters cleanly when the pod terminates.
 - **Deployment** `github-runner` running a single replica of `partofaplan/github-actions-runner-java:latest` (extends the official image with Temurin JDK 17 and Apache Maven).
 
-All manifests live under `manifests/` and are bundled via Kustomize.
+All manifests live under `manifests/` and can be applied directly with `kubectl`.
 
 ## Prerequisites
 - A Kubernetes cluster reachable via `kubectl` (kind, k3d, minikube, etc.).
-- `kubectl` v1.21+ with Kustomize (built-in since v1.14).
+- `kubectl` v1.21+.
 - A GitHub personal access token (PAT) with the required scope:
   - For a repository-scoped runner: `repo`.
   - For an organization-wide runner: `admin:org`.
@@ -69,8 +69,13 @@ Example adjustments for a repository runner:
 
 ## 4. Deploy the Runner
 
+Apply the manifests (order matters the first time so the namespace exists before other objects target it):
+
 ```bash
-kubectl apply -k manifests/
+kubectl apply -f manifests/namespace.yaml
+kubectl apply -f manifests/configmap.yaml
+kubectl apply -f manifests/serviceaccount.yaml
+kubectl apply -f manifests/deployment.yaml
 ```
 
 Watch the pod come up and tail its logs:
@@ -89,7 +94,9 @@ Within a few seconds the runner should appear in the GitHub UI under **Settings 
 ## Cleanup
 
 ```bash
-kubectl delete -k manifests/
+kubectl delete -f manifests/deployment.yaml
+kubectl delete -f manifests/serviceaccount.yaml
+kubectl delete -f manifests/configmap.yaml
 kubectl delete namespace github-actions-runner
 ```
 
