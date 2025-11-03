@@ -24,7 +24,7 @@ spec:
             - name: GITHUB_OWNER
               value: "partofaplan"
             - name: GITHUB_REPOSITORY
-              value: "github-java-runner"
+              value: "sample-java-application"
             - name: RUNNER_LABELS
               value: "self-hosted,kubernetes,local,alpha"
             - name: RUNNER_NAME
