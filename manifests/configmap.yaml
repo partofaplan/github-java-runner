@@ -14,7 +14,7 @@ data:
     fi
 
     log() {
-      echo "[$(date --iso-8601=seconds)] $*"
+      echo "[$(date --iso-8601=seconds)] $*" >&2
     }
 
     require_env() {
@@ -54,42 +54,78 @@ data:
       local method="$1"
       local path="$2"
       shift 2
-      curl -fsSL -X "${method}" \
+      local response body status
+      response="$(curl -sSLw '\n%{http_code}' -X "${method}" \
         -H "Accept: application/vnd.github+json" \
         -H "Authorization: Bearer ${GITHUB_PAT}" \
         -H "X-GitHub-Api-Version: 2022-11-28" \
-        "${API_URL}/${path}" "$@"
+        "${API_URL}/${path}" "$@")"
+      body="$(printf '%s' "${response}" | sed '$d')"
+      status="$(printf '%s' "${response}" | tail -n 1)"
+      if ! [[ "${status}" =~ ^[0-9]+$ ]]; then
+        log "ERROR: Unable to parse GitHub API status from response: ${response}"
+        return 1
+      fi
+      if (( status < 200 || status >= 300 )); then
+        log "ERROR: GitHub API ${method} ${path} returned HTTP ${status}"
+        log "Response body: ${body}"
+        return 1
+      fi
+      printf '%s' "${body}"
     }
 
     fetch_token() {
       local action="$1" # registration-token or remove-token
-      local json
+      local json token
       if ! json="$(github_api POST "${SCOPE_PATH}/actions/runners/${action}")"; then
         log "ERROR: Failed to request ${action} for ${SCOPE_DESC}"
         return 1
       fi
-      python3 - <<'PY' <<<"${json}"
-    import json,sys
-    try:
-        print(json.load(sys.stdin)["token"])
-    except (KeyError, json.JSONDecodeError):
-        raise SystemExit(1)
-    PY
+      log "GitHub API body for ${action}: ${json}"
+      if ! token="$(python3 -c 'import json,sys; data=json.load(sys.stdin); print(data.get("token",""), end="")' <<<"${json}")"; then
+        log "ERROR: Response did not contain token: ${json}"
+        return 1
+      fi
+      printf '%s' "${token}"
+    }
+
+    sanitize_token() {
+      # Remove newlines or carriage returns to keep tokens shell-safe.
+      local token="$1"
+      token="${token//$'\r'/}"
+      token="${token//$'\n'/}"
+      printf '%s' "${token}"
     }
 
     log "Requesting short-lived registration token for ${SCOPE_DESC}…"
-    REG_TOKEN="$(fetch_token registration-token)"
-
-    if [[ -z "${REG_TOKEN}" ]]; then
+    if ! REG_TOKEN_RAW="$(fetch_token registration-token)"; then
       log "ERROR: Registration token response did not contain a token."
       exit 1
     fi
 
+    log "Registration token raw (b64): $(printf '%s' "${REG_TOKEN_RAW}" | base64)"
+
+    REG_TOKEN="$(sanitize_token "${REG_TOKEN_RAW}")"
+    if [[ -z "${REG_TOKEN}" ]]; then
+      log "ERROR: Registration token was empty after sanitization."
+      exit 1
+    fi
+    log "Received registration token (prefix: ${REG_TOKEN:0:4}***)."
+
     cleanup() {
       log "Runner shutdown requested. Attempting deregistration…"
-      if REMOVE_TOKEN="$(fetch_token remove-token)"; then
-        ./config.sh remove --unattended --token "${REMOVE_TOKEN}" || true
-        log "Runner deregistered from ${SCOPE_DESC}"
+      if [[ "${RUNNER_CONFIGURED:-false}" != "true" ]]; then
+        log "Runner was not fully configured; skipping deregistration."
+        return
+      fi
+      if REMOVE_TOKEN_RAW="$(fetch_token remove-token)"; then
+        REMOVE_TOKEN="$(sanitize_token "${REMOVE_TOKEN_RAW}")"
+        if [[ -n "${REMOVE_TOKEN}" ]]; then
+          ./config.sh remove --token "${REMOVE_TOKEN}" || true
+          log "Runner deregistered from ${SCOPE_DESC}"
+        else
+          log "WARNING: Removal token empty after sanitization; skipping deregistration."
+        fi
       else
         log "WARNING: Failed to obtain removal token; runner may remain registered."
       fi
@@ -107,6 +143,8 @@ data:
       --work "${RUNNER_WORKDIR}" \
       --unattended \
       --replace
+
+    RUNNER_CONFIGURED=true
 
     log "Runner configuration complete; starting listener…"
     exec ./run.sh
