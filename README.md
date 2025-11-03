@@ -9,7 +9,7 @@ Deploy a self-hosted GitHub Actions runner into a local Kubernetes cluster using
   - Requests short-lived registration & removal tokens through the GitHub REST API.
   - Registers the runner with configurable labels.
   - Deregisters cleanly when the pod terminates.
-- **Deployment** `github-runner` running a single replica of `partofaplan/github-actions-runner-java:latest` (extends the official image with Temurin JDK 17 and Apache Maven).
+- **Deployment** `github-runner` running a single replica of `partofaplan/github-actions-runner-java:latest` (extends the official image with Temurin JDK 17, Apache Maven, and Docker CLI).
 
 All manifests live under `manifests/` and can be applied directly with `kubectl`.
 
@@ -37,7 +37,7 @@ If you prefer YAML, see `manifests/secret-pat.yaml.sample`, replace the placehol
 
 ## 2. Build & Push the Java Runner Image
 
-A lightweight Dockerfile (`docker/Dockerfile`) extends the official runner image with OpenJDK 17 and Maven 3.9.11 pre-installed so Maven builds work out-of-the-box.
+A lightweight Dockerfile (`docker/Dockerfile`) extends the official runner image with OpenJDK 17, Maven 3.9.11, and the Docker CLI so Maven builds and container workloads are supported out-of-the-box (mount `/var/run/docker.sock` or use a remote builder to run Docker commands).
 
 ```bash
 IMAGE_TAG=partofaplan/github-actions-runner-java:latest

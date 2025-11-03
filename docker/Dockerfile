@@ -13,6 +13,7 @@ RUN apt-get update \
         ca-certificates \
         tar \
         gnupg \
+        docker.io \
     && curl -fsSL "https://dlcdn.apache.org/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" -o /tmp/maven.tar.gz \
     && echo "${MAVEN_SHA512}  /tmp/maven.tar.gz" | sha512sum -c - \
     && tar -xzf /tmp/maven.tar.gz -C /opt \
@@ -20,6 +21,8 @@ RUN apt-get update \
     && rm /tmp/maven.tar.gz \
     && JAVA_HOME="$(dirname "$(dirname "$(readlink -f "$(command -v java)")")")" \
     && ln -sfn "${JAVA_HOME}" /opt/java-home \
+    && groupadd -f docker \
+    && usermod -aG docker runner \
     && rm -rf /var/lib/apt/lists/*
 
 ENV JAVA_HOME=/opt/java-home
