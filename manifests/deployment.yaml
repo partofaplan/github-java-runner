@@ -18,7 +18,7 @@ spec:
       containers:
         - name: runner
           image: partofaplan/github-actions-runner-java:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           command: ["/bin/bash", "/runner/runner-entrypoint.sh"]
           env:
             - name: GITHUB_OWNER
