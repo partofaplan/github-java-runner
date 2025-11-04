@@ -21,7 +21,7 @@ RUN apt-get update \
     && rm /tmp/maven.tar.gz \
     && JAVA_HOME="$(dirname "$(dirname "$(readlink -f "$(command -v java)")")")" \
     && ln -sfn "${JAVA_HOME}" /opt/java-home \
-    && groupadd -f docker \
+    && if getent group docker >/dev/null; then groupmod -o -g 2375 docker; else groupadd -g 2375 docker; fi \
     && usermod -aG docker runner \
     && rm -rf /var/lib/apt/lists/*
 
