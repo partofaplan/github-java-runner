@@ -27,8 +27,6 @@ spec:
               value: "sample-java-application"
             - name: RUNNER_LABELS
               value: "self-hosted,kubernetes,local,alpha"
-            - name: DOCKER_HOST
-              value: "tcp://localhost:2375"
             - name: RUNNER_NAME
               valueFrom:
                 fieldRef:
@@ -44,8 +42,8 @@ spec:
               subPath: runner-entrypoint.sh
             - name: runner-work
               mountPath: /actions-runner/_work
-            - name: docker-sock
-              mountPath: /var/run
+            - name: host-docker-sock
+              mountPath: /var/run/docker.sock
           resources:
             requests:
               cpu: "500m"
@@ -53,22 +51,6 @@ spec:
             limits:
               cpu: "2"
               memory: 4Gi
-        - name: dind
-          image: docker:25.0.5-dind
-          securityContext:
-            privileged: true
-          env:
-            - name: DOCKER_TLS_CERTDIR
-              value: ""
-          args:
-            - --host=tcp://0.0.0.0:2375
-            - --host=unix:///var/run/docker.sock
-            - --storage-driver=overlay2
-          volumeMounts:
-            - name: docker-graph
-              mountPath: /var/lib/docker
-            - name: docker-sock
-              mountPath: /var/run
       volumes:
         - name: runner-scripts
           configMap:
@@ -76,7 +58,7 @@ spec:
             defaultMode: 0755
         - name: runner-work
           emptyDir: {}
-        - name: docker-graph
-          emptyDir: {}
-        - name: docker-sock
-          emptyDir: {}
+        - name: host-docker-sock
+          hostPath:
+            path: /var/run/docker.sock
+            type: Socket
