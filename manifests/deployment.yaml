@@ -20,6 +20,10 @@ spec:
           image: partofaplan/github-actions-runner-java:latest
           imagePullPolicy: Always
           command: ["/bin/bash", "/runner/runner-entrypoint.sh"]
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            allowPrivilegeEscalation: true
           env:
             - name: GITHUB_OWNER
               value: "partofaplan"
@@ -27,6 +31,8 @@ spec:
               value: "sample-java-application"
             - name: RUNNER_LABELS
               value: "self-hosted,kubernetes,local,alpha"
+            - name: RUNNER_ALLOW_RUNASROOT
+              value: "1"
             - name: RUNNER_NAME
               valueFrom:
                 fieldRef:
